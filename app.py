@@ -13,12 +13,17 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if not ANTHROPIC_API_KEY:
-    raise RuntimeError("Missing ANTHROPIC_API_KEY — make sure you have a .env file with your key.")
+    raise RuntimeError("Missing ANTHROPIC_API_KEY — check your .env file.")
 
 HEADERS = {
     "x-api-key": ANTHROPIC_API_KEY,
     "anthropic-version": "2023-06-01",
     "Content-Type": "application/json",
+}
+
+MODELS = {
+    "sonnet": "claude-sonnet-4-20250514",
+    "opus": "claude-opus-4-20250514",
 }
 
 JSON_SCHEMA = """{
@@ -35,7 +40,7 @@ JSON_SCHEMA = """{
   "risks": ["risk factors as short strings"],
   "summary": "2-3 sentence investor-grade summary.",
   "data_confidence": "high/medium/low",
-  "burn_rate_severity": "critical/warning/healthy or null",
+  "burn_rate_severity": "critical/warning/healthy or null — critical under 6 months, warning 6-12 months, healthy over 12 months",
   "trial_success_rates": [{"drug": "name", "phase": "Phase X", "indication": "disease", "historical_rate": "e.g. 40%", "context": "one sentence"}],
   "sentiment": {"score": "positive/neutral/cautious/negative", "signals": ["2-3 signals from management language"]}
 }"""
@@ -44,26 +49,42 @@ JSON_SCHEMA = """{
 def build_prompt(text, is_search):
     if is_search:
         return (
-            f'You are a biotech investor analyst. Today is April 1, 2026. '
-            f'Search for the most recent earnings release or SEC filing for: "{text}". '
-            f'Extract all data and return ONLY valid raw JSON, no markdown, no backticks:\n{JSON_SCHEMA}'
+            'You are a senior biotech investor analyst. Today is April 1, 2026. '
+            'Search the web thoroughly for the most recent earnings release, SEC filing, pipeline update, or any investor information for: "' + text + '". '
+            'Search for the company name, ticker symbol, drug names, and any related filings. '
+            'Extract ALL available data and return ONLY valid raw JSON, no markdown, no backticks:\n' + JSON_SCHEMA
         )
     else:
         return (
-            f'You are a biotech investor analyst. Today is April 1, 2026. '
-            f'Extract all data from the filing below and return ONLY valid raw JSON, no markdown, no backticks:\n{JSON_SCHEMA}'
-            f'\n\nFiling text:\n{text}'
+            'You are a senior biotech investor analyst. Today is April 1, 2026. '
+            'Extract all data from the filing below and return ONLY valid raw JSON, no markdown, no backticks:\n' + JSON_SCHEMA +
+            '\n\nFiling text:\n' + text
         )
 
 
-def run_claude(prompt, use_search=False):
+def extract_json(raw):
+    match = re.search(r'\{[\s\S]*\}', raw)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group())
+    except json.JSONDecodeError:
+        try:
+            clean = re.sub(r'[\x00-\x1f\x7f]', '', match.group())
+            return json.loads(clean)
+        except json.JSONDecodeError:
+            return None
+
+
+def run_claude(prompt, model_key="sonnet", use_search=False):
+    model = MODELS.get(model_key, MODELS["sonnet"])
     messages = [{"role": "user", "content": prompt}]
     tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}] if use_search else []
 
     for _ in range(10):
         body = {
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 1500,
+            "model": model,
+            "max_tokens": 2000,
             "messages": messages,
         }
         if tools:
@@ -74,7 +95,7 @@ def run_claude(prompt, use_search=False):
                 "https://api.anthropic.com/v1/messages",
                 headers=HEADERS,
                 json=body,
-                timeout=60,
+                timeout=90,
             )
         except requests.exceptions.Timeout:
             raise Exception("Request timed out. Try again.")
@@ -116,27 +137,34 @@ def analyze():
         return jsonify({"error": "No text provided"}), 400
 
     text = data["text"].strip()
+    model_key = data.get("model", "sonnet")
     is_search = len(text) < 200 and "\n" not in text
 
-    # Truncate pasted text to avoid token limits
     if not is_search and len(text) > 10000:
         text = text[:10000] + "\n[truncated]"
 
+    # First attempt
     try:
-        raw = run_claude(build_prompt(text, is_search), use_search=is_search)
+        raw = run_claude(build_prompt(text, is_search), model_key=model_key, use_search=is_search)
+        parsed = extract_json(raw)
+        if parsed:
+            return jsonify(parsed)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        if "rate limit" not in str(e).lower():
+            return jsonify({"error": str(e)}), 500
 
-    match = re.search(r"\{[\s\S]*\}", raw)
-    if not match:
-        return jsonify({"error": "Claude returned an unexpected response. Try again."}), 500
+    # Auto retry with broader query for search mode
+    if is_search:
+        try:
+            retry_text = f"{text} biotech pharma pipeline earnings SEC filing clinical trials investor"
+            raw = run_claude(build_prompt(retry_text, True), model_key=model_key, use_search=True)
+            parsed = extract_json(raw)
+            if parsed:
+                return jsonify(parsed)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
-    try:
-        parsed = json.loads(match.group())
-    except json.JSONDecodeError:
-        return jsonify({"error": "Could not parse response as JSON. Try again."}), 500
-
-    return jsonify(parsed)
+    return jsonify({"error": "Could not find enough data. Try adding more detail to your search e.g. company name + 'pipeline 2026'"}), 500
 
 
 if __name__ == "__main__":

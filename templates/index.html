@@ -13,11 +13,24 @@
     header h1 { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5cff8f; font-weight: normal; }
     header p { font-size: 12px; color: #888; margin-top: 6px; }
 
-    .input-modes { display: flex; gap: 0; margin-bottom: 10px; }
+    .top-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
+
+    .input-modes { display: flex; }
     .mode-btn { font-family: 'Courier New', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 7px 16px; border: 1px solid #2a2a2a; background: transparent; color: #888; cursor: pointer; transition: all 0.15s; }
     .mode-btn:first-child { border-radius: 4px 0 0 4px; }
     .mode-btn:last-child { border-radius: 0 4px 4px 0; border-left: none; }
     .mode-btn.active { background: #1a2e1a; color: #5cff8f; border-color: #2a4a2a; }
+
+    .model-selector { display: flex; align-items: center; gap: 8px; }
+    .model-selector label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #888; }
+    .model-selector select {
+      font-family: 'Courier New', monospace; font-size: 11px; padding: 7px 12px;
+      background: #141414; color: #e8e8e0; border: 1px solid #2a2a2a;
+      border-radius: 4px; cursor: pointer; outline: none;
+      transition: border-color 0.15s;
+    }
+    .model-selector select:focus { border-color: #5cff8f; }
+    .model-selector select option { background: #141414; }
 
     .input-hint { font-size: 11px; color: #777; margin-bottom: 8px; }
 
@@ -66,7 +79,7 @@
     .tag.trial    { background: #141e2e; color: #5cc8ff; border-color: #1e3a52; }
     .tag.fda      { background: #2a2210; color: #ffcc44; border-color: #3a3010; }
     .tag.risk     { background: #2e1414; color: #ff6b6b; border-color: #4a2020; }
-    .tag.none     { color: #444; border-color: transparent; background: transparent; }
+    .tag.none     { color: #666; border-color: transparent; background: transparent; }
 
     .new-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 1.75rem; }
     .new-metric-card { background: #141414; border: 1px solid #2a2a2a; border-radius: 4px; padding: 16px; }
@@ -83,7 +96,7 @@
     .success-rate-bar { height: 4px; border-radius: 2px; background: #5cff8f; transition: width 0.6s ease; }
     .success-rate-pct { font-size: 12px; color: #5cff8f; min-width: 36px; text-align: right; }
     .success-rate-name { color: #ccc; min-width: 80px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .success-rate-context { font-size: 10px; color: #777; margin-bottom: 10px; padding-left: 0; line-height: 1.4; }
+    .success-rate-context { font-size: 10px; color: #777; margin-bottom: 10px; line-height: 1.4; }
 
     .sentiment-score { font-size: 16px; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
     .sentiment-score.positive { color: #5cff8f; }
@@ -96,9 +109,10 @@
     .divider { border: none; border-top: 1px solid #1e1e1e; margin: 1.5rem 0; }
     .summary-box { border-left: 2px solid #5cff8f; padding: 12px 16px; background: #101a10; border-radius: 0 4px 4px 0; }
     .summary-box p { font-size: 13px; line-height: 1.8; color: #ddd; font-family: Georgia, serif; }
-    .confidence { font-size: 11px; color: #aaa; margin-top: 1rem; font-size: 12px; }
+    .confidence { font-size: 12px; color: #aaa; margin-top: 1rem; }
 
     .error-box { background: #2e1414; border: 1px solid #4a2020; border-radius: 4px; padding: 12px 14px; font-size: 13px; color: #ff6b6b; margin-top: 0.5rem; }
+    .model-tag { font-size: 10px; color: #555; margin-left: auto; text-transform: uppercase; letter-spacing: 0.06em; }
   </style>
 </head>
 <body>
@@ -108,15 +122,24 @@
     <p>Type a company name to search live — or switch to paste mode for full filing text.</p>
   </header>
 
-  <div class="input-modes">
-    <button class="mode-btn active" id="btnSearch" onclick="setMode('search')">Search</button>
-    <button class="mode-btn" id="btnPaste" onclick="setMode('paste')">Paste filing</button>
+  <div class="top-controls">
+    <div class="input-modes">
+      <button class="mode-btn active" id="btnSearch" onclick="setMode('search')">Search</button>
+      <button class="mode-btn" id="btnPaste" onclick="setMode('paste')">Paste filing</button>
+    </div>
+    <div class="model-selector">
+      <label>Model</label>
+      <select id="modelSelect">
+        <option value="sonnet">Sonnet — Fast & Accurate</option>
+        <option value="opus">Opus — Deep Analysis</option>
+      </select>
+    </div>
   </div>
 
-  <p class="input-hint" id="hint">Type a company name or query — e.g. "Moderna Q1 2025" or "MRNA latest filing"</p>
+  <p class="input-hint" id="hint">Type a company name or query — e.g. "Moderna Q1 2026" or "Assembly Biosciences"</p>
 
   <div id="searchInput">
-    <input type="text" id="queryInput" placeholder='e.g. "Moderna Q1 2025"  or  "Pfizer latest pipeline update"' />
+    <input type="text" id="queryInput" placeholder='e.g. "Moderna latest pipeline"  or  "TNX-102"  or  "Assembly Biosciences"' />
   </div>
   <div id="pasteInput" style="display:none">
     <textarea id="pasteText" placeholder="Paste SEC 10-Q/10-K, earnings press release, clinical readout..."></textarea>
@@ -126,6 +149,7 @@
     <button class="primary" id="analyzeBtn" onclick="analyze()">Analyze</button>
     <button onclick="loadSample()" id="sampleBtn" style="display:none">Load sample</button>
     <span class="status" id="status"></span>
+    <span class="model-tag" id="modelTag"></span>
   </div>
 
   <div id="errorBox"></div>
@@ -185,7 +209,7 @@ Risks: Continued losses, pivotal trial failure catastrophic, follow-on offering 
     document.getElementById('pasteInput').style.display = m === 'paste' ? 'block' : 'none';
     document.getElementById('sampleBtn').style.display = m === 'paste' ? 'inline-block' : 'none';
     document.getElementById('hint').textContent = m === 'search'
-      ? 'Type a company name or query — e.g. "Moderna Q1 2025" or "MRNA latest filing"'
+      ? 'Type a company name, ticker, or drug name — e.g. "Assembly Biosciences" or "TNX-102"'
       : 'Paste the full text of an SEC filing, earnings release, or clinical readout';
   }
 
@@ -199,6 +223,10 @@ Risks: Continued losses, pivotal trial failure catastrophic, follow-on offering 
       : document.getElementById('pasteText').value.trim();
   }
 
+  function getModel() {
+    return document.getElementById('modelSelect').value;
+  }
+
   function tag(text, cls) { return `<span class="tag ${cls}">${text}</span>`; }
   function none() { return `<span class="tag none">None identified</span>`; }
 
@@ -207,13 +235,13 @@ Risks: Continued losses, pivotal trial failure catastrophic, follow-on offering 
     const labels = { critical: 'CRITICAL', warning: 'WARNING', healthy: 'HEALTHY' };
     const descs = {
       critical: 'Under 6 months of runway — high dilution or failure risk.',
-      warning: '6–12 months of runway — fundraise likely needed soon.',
-      healthy: 'Over 12 months of runway — well-funded for now.'
+      warning: '6-12 months of runway — fundraise likely needed soon.',
+      healthy: 'Over 12 months of runway — well funded.'
     };
     return `<div class="new-metric-card">
       <div class="new-metric-title">Burn Rate Severity</div>
       <div class="burn-badge ${severity}">${labels[severity] || severity}</div>
-      <div class="burn-desc">${descs[severity] || ''}${months ? ` (${months} months remaining)` : ''}</div>
+      <div class="burn-desc">${descs[severity] || ''}${months ? ' (' + months + ' months remaining)' : ''}</div>
     </div>`;
   }
 
@@ -275,6 +303,7 @@ Risks: Continued losses, pivotal trial failure catastrophic, follow-on offering 
     document.getElementById('fdaDates').innerHTML = d.fda_dates?.length ? d.fda_dates.map(f => tag(`${f.type}: ${f.date} — ${f.drug}`, 'fda')).join('') : none();
     document.getElementById('risks').innerHTML = d.risks?.length ? d.risks.map(r => tag(r, 'risk')).join('') : none();
     document.getElementById('summary').textContent = d.summary || '';
+
     const confEl = document.getElementById('confidence');
     if (d.data_confidence) {
       const colors = { high: '#5cff8f', medium: '#ffcc44', low: '#ff6b6b' };
@@ -282,7 +311,10 @@ Risks: Continued losses, pivotal trial failure catastrophic, follow-on offering 
       const borders = { high: '#2a4a2a', medium: '#3a3010', low: '#4a2020' };
       const c = d.data_confidence.toLowerCase();
       confEl.innerHTML = `<span style="display:inline-block;padding:4px 12px;border-radius:3px;font-size:11px;border:1px solid ${borders[c]||'#333'};background:${bgs[c]||'#1a1a1a'};color:${colors[c]||'#aaa'}">Data confidence: ${d.data_confidence.toUpperCase()}</span>`;
-    } else { confEl.innerHTML = ''; }
+    } else {
+      confEl.innerHTML = '';
+    }
+
     document.getElementById('results').classList.add('visible');
   }
 
@@ -290,22 +322,25 @@ Risks: Continued losses, pivotal trial failure catastrophic, follow-on offering 
     const text = getText();
     if (!text) return;
 
+    const model = getModel();
     const btn = document.getElementById('analyzeBtn');
     const status = document.getElementById('status');
     const errorBox = document.getElementById('errorBox');
+    const modelTag = document.getElementById('modelTag');
 
     btn.disabled = true;
     document.getElementById('results').classList.remove('visible');
     errorBox.innerHTML = '';
+    modelTag.textContent = '';
     status.innerHTML = mode === 'search'
-      ? '<span class="spinner"></span>Searching the web & analyzing...'
+      ? '<span class="spinner"></span>Searching & analyzing...'
       : '<span class="spinner"></span>Extracting data...';
 
     try {
       const res = await fetch('/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, model })
       });
 
       const data = await res.json();
@@ -313,6 +348,7 @@ Risks: Continued losses, pivotal trial failure catastrophic, follow-on offering 
 
       renderResults(data);
       status.innerHTML = '';
+      modelTag.textContent = model === 'opus' ? 'via Opus' : 'via Sonnet';
     } catch (err) {
       status.innerHTML = '';
       errorBox.innerHTML = `<div class="error-box">Error: ${err.message}</div>`;
