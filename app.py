@@ -143,9 +143,3 @@ if __name__ == "__main__":
     print("\n✓ Biotech Filing Analyzer running at http://127.0.0.1:5000\n")
     app.run(host='0.0.0.0', port=5000)
 ```
-
-**Fix 2 — Add a Procfile**
-
-In your `biotech-analyzer` folder create a new file called exactly `Procfile` (no extension, capital P) with this inside:
-```
-web: python app.py
