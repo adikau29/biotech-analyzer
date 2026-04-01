@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Biotech Filing Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Courier New', monospace; background: #0d0d0d; color: #e8e8e0; min-height: 100vh; padding: 2rem; }
+    .container { max-width: 900px; margin: 0 auto; }
+
+    header { margin-bottom: 2rem; border-bottom: 1px solid #2a2a2a; padding-bottom: 1.25rem; }
+    header h1 { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #5cff8f; font-weight: normal; }
+    header p { font-size: 12px; color: #888; margin-top: 6px; }
+
+    .input-modes { display: flex; gap: 0; margin-bottom: 10px; }
+    .mode-btn { font-family: 'Courier New', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 7px 16px; border: 1px solid #2a2a2a; background: transparent; color: #888; cursor: pointer; transition: all 0.15s; }
+    .mode-btn:first-child { border-radius: 4px 0 0 4px; }
+    .mode-btn:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+    .mode-btn.active { background: #1a2e1a; color: #5cff8f; border-color: #2a4a2a; }
+
+    .input-hint { font-size: 11px; color: #777; margin-bottom: 8px; }
+
+    textarea, input[type=text] {
+      width: 100%; padding: 14px; background: #141414; color: #e8e8e0;
+      border: 1px solid #2a2a2a; border-radius: 4px;
+      font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.7;
+      margin-bottom: 1rem; transition: border-color 0.2s;
+    }
+    textarea { min-height: 180px; resize: vertical; }
+    textarea:focus, input[type=text]:focus { outline: none; border-color: #5cff8f; }
+    textarea::placeholder, input::placeholder { color: #444; }
+
+    .btn-row { display: flex; gap: 10px; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; }
+    button { font-family: 'Courier New', monospace; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 9px 20px; border-radius: 4px; cursor: pointer; border: 1px solid #2a2a2a; background: transparent; color: #e8e8e0; transition: all 0.15s; }
+    button:hover { border-color: #5cff8f; color: #5cff8f; }
+    button.primary { background: #5cff8f; color: #0d0d0d; border-color: #5cff8f; font-weight: bold; }
+    button.primary:hover { background: #3de07a; }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .status { font-size: 12px; color: #888; }
+    .spinner { display: inline-block; width: 10px; height: 10px; border: 1.5px solid #333; border-top-color: #5cff8f; border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 6px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .results { display: none; }
+    .results.visible { display: block; }
+
+    .company-bar { display: flex; align-items: baseline; gap: 12px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .company-name { font-size: 20px; font-weight: bold; color: #fff; }
+    .ticker-badge { font-size: 11px; padding: 3px 10px; background: #1a2e1a; color: #5cff8f; border: 1px solid #2a4a2a; border-radius: 3px; }
+
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 1.75rem; }
+    .metric { background: #141414; border: 1px solid #2a2a2a; border-radius: 4px; padding: 14px; }
+    .metric-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 8px; }
+    .metric-value { font-size: 22px; }
+    .metric-value.green { color: #5cff8f; }
+    .metric-value.yellow { color: #ffcc44; }
+    .metric-value.red { color: #ff6b6b; }
+    .metric-sub { font-size: 11px; color: #888; margin-top: 4px; }
+
+    .section { margin-bottom: 1.5rem; }
+    .section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; margin-bottom: 10px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 7px; }
+    .tag { font-size: 11px; padding: 4px 10px; border-radius: 3px; border: 1px solid; }
+    .tag.catalyst { background: #1a2e1a; color: #5cff8f; border-color: #2a4a2a; }
+    .tag.trial    { background: #141e2e; color: #5cc8ff; border-color: #1e3a52; }
+    .tag.fda      { background: #2a2210; color: #ffcc44; border-color: #3a3010; }
+    .tag.risk     { background: #2e1414; color: #ff6b6b; border-color: #4a2020; }
+    .tag.none     { color: #444; border-color: transparent; background: transparent; }
+
+    .new-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 1.75rem; }
+    .new-metric-card { background: #141414; border: 1px solid #2a2a2a; border-radius: 4px; padding: 16px; }
+    .new-metric-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; margin-bottom: 10px; }
+
+    .burn-badge { display: inline-block; font-size: 13px; font-weight: bold; padding: 6px 14px; border-radius: 3px; margin-bottom: 8px; }
+    .burn-badge.critical { background: #2e1414; color: #ff6b6b; border: 1px solid #4a2020; }
+    .burn-badge.warning  { background: #2a2210; color: #ffcc44; border: 1px solid #3a3010; }
+    .burn-badge.healthy  { background: #1a2e1a; color: #5cff8f; border: 1px solid #2a4a2a; }
+    .burn-desc { font-size: 11px; color: #888; line-height: 1.5; }
+
+    .success-rate-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .success-rate-bar-bg { flex: 1; height: 4px; background: #222; border-radius: 2px; }
+    .success-rate-bar { height: 4px; border-radius: 2px; background: #5cff8f; transition: width 0.6s ease; }
+    .success-rate-pct { font-size: 12px; color: #5cff8f; min-width: 36px; text-align: right; }
+    .success-rate-name { color: #ccc; min-width: 80px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .success-rate-context { font-size: 10px; color: #777; margin-bottom: 10px; padding-left: 0; line-height: 1.4; }
+
+    .sentiment-score { font-size: 16px; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .sentiment-score.positive { color: #5cff8f; }
+    .sentiment-score.neutral  { color: #aaa; }
+    .sentiment-score.cautious { color: #ffcc44; }
+    .sentiment-score.negative { color: #ff6b6b; }
+    .sentiment-signal { font-size: 11px; color: #aaa; padding: 5px 0; border-bottom: 1px solid #1a1a1a; line-height: 1.4; }
+    .sentiment-signal:last-child { border-bottom: none; }
+
+    .divider { border: none; border-top: 1px solid #1e1e1e; margin: 1.5rem 0; }
+    .summary-box { border-left: 2px solid #5cff8f; padding: 12px 16px; background: #101a10; border-radius: 0 4px 4px 0; }
+    .summary-box p { font-size: 13px; line-height: 1.8; color: #ddd; font-family: Georgia, serif; }
+    .confidence { font-size: 11px; color: #aaa; margin-top: 1rem; font-size: 12px; }
+
+    .error-box { background: #2e1414; border: 1px solid #4a2020; border-radius: 4px; padding: 12px 14px; font-size: 13px; color: #ff6b6b; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Biotech Filing Analyzer</h1>
+    <p>Type a company name to search live — or switch to paste mode for full filing text.</p>
+  </header>
+
+  <div class="input-modes">
+    <button class="mode-btn active" id="btnSearch" onclick="setMode('search')">Search</button>
+    <button class="mode-btn" id="btnPaste" onclick="setMode('paste')">Paste filing</button>
+  </div>
+
+  <p class="input-hint" id="hint">Type a company name or query — e.g. "Moderna Q1 2025" or "MRNA latest filing"</p>
+
+  <div id="searchInput">
+    <input type="text" id="queryInput" placeholder='e.g. "Moderna Q1 2025"  or  "Pfizer latest pipeline update"' />
+  </div>
+  <div id="pasteInput" style="display:none">
+    <textarea id="pasteText" placeholder="Paste SEC 10-Q/10-K, earnings press release, clinical readout..."></textarea>
+  </div>
+
+  <div class="btn-row">
+    <button class="primary" id="analyzeBtn" onclick="analyze()">Analyze</button>
+    <button onclick="loadSample()" id="sampleBtn" style="display:none">Load sample</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div id="errorBox"></div>
+
+  <div class="results" id="results">
+    <div class="company-bar">
+      <span class="company-name" id="companyName"></span>
+      <span class="ticker-badge" id="ticker"></span>
+    </div>
+
+    <div class="metrics" id="metricsGrid"></div>
+    <div class="new-metrics" id="newMetrics"></div>
+
+    <div class="section">
+      <div class="section-label">Key catalysts</div>
+      <div class="tags" id="catalysts"></div>
+    </div>
+    <div class="section">
+      <div class="section-label">Clinical trials</div>
+      <div class="tags" id="trials"></div>
+    </div>
+    <div class="section">
+      <div class="section-label">FDA / PDUFA dates</div>
+      <div class="tags" id="fdaDates"></div>
+    </div>
+    <div class="section">
+      <div class="section-label">Risk flags</div>
+      <div class="tags" id="risks"></div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section">
+      <div class="section-label">Analyst summary</div>
+      <div class="summary-box"><p id="summary"></p></div>
+    </div>
+    <p class="confidence" id="confidence"></p>
+  </div>
+</div>
+
+<script>
+  const SAMPLE_TEXT = `ACME Therapeutics, Inc. (NASDAQ: ACME) reported Q1 2025 financial results.
+Cash: $187.3 million as of March 31, 2025. Net loss Q1: $28.4 million. Operating expenses: $31.2 million.
+ACM-101 (Non-Small Cell Lung Cancer) Phase 3 CLARITY trial fully enrolled, 480 patients. Readout Q4 2025. FDA PDUFA date February 14, 2026. Phase 2 ORR: 67% vs 31% chemotherapy.
+ACM-204 (Pompe Disease) Phase 2 initiated Jan 2025, 8/30 patients enrolled. Interim data Q2 2025. Orphan Drug Designation received.
+ACM-315 (Immuno-oncology) Phase 1 dose escalation ongoing, 3 cohorts complete. Expansion cohort H2 2025.
+"Cash runway into Q1 2027," said CEO Dr. Sarah Chen.
+Risks: Continued losses, pivotal trial failure catastrophic, follow-on offering possible if ACM-101 fails.`;
+
+  let mode = 'search';
+
+  function setMode(m) {
+    mode = m;
+    document.getElementById('btnSearch').classList.toggle('active', m === 'search');
+    document.getElementById('btnPaste').classList.toggle('active', m === 'paste');
+    document.getElementById('searchInput').style.display = m === 'search' ? 'block' : 'none';
+    document.getElementById('pasteInput').style.display = m === 'paste' ? 'block' : 'none';
+    document.getElementById('sampleBtn').style.display = m === 'paste' ? 'inline-block' : 'none';
+    document.getElementById('hint').textContent = m === 'search'
+      ? 'Type a company name or query — e.g. "Moderna Q1 2025" or "MRNA latest filing"'
+      : 'Paste the full text of an SEC filing, earnings release, or clinical readout';
+  }
+
+  function loadSample() {
+    document.getElementById('pasteText').value = SAMPLE_TEXT;
+  }
+
+  function getText() {
+    return mode === 'search'
+      ? document.getElementById('queryInput').value.trim()
+      : document.getElementById('pasteText').value.trim();
+  }
+
+  function tag(text, cls) { return `<span class="tag ${cls}">${text}</span>`; }
+  function none() { return `<span class="tag none">None identified</span>`; }
+
+  function renderBurnRate(severity, months) {
+    if (!severity) return '';
+    const labels = { critical: 'CRITICAL', warning: 'WARNING', healthy: 'HEALTHY' };
+    const descs = {
+      critical: 'Under 6 months of runway — high dilution or failure risk.',
+      warning: '6–12 months of runway — fundraise likely needed soon.',
+      healthy: 'Over 12 months of runway — well-funded for now.'
+    };
+    return `<div class="new-metric-card">
+      <div class="new-metric-title">Burn Rate Severity</div>
+      <div class="burn-badge ${severity}">${labels[severity] || severity}</div>
+      <div class="burn-desc">${descs[severity] || ''}${months ? ` (${months} months remaining)` : ''}</div>
+    </div>`;
+  }
+
+  function renderSuccessRates(rates) {
+    if (!rates || !rates.length) return '';
+    const rows = rates.map(r => {
+      const pct = parseInt(r.historical_rate) || 0;
+      return `<div class="success-rate-row">
+        <span class="success-rate-name" title="${r.drug || ''}">${r.drug || ''}</span>
+        <div class="success-rate-bar-bg"><div class="success-rate-bar" style="width:${pct}%"></div></div>
+        <span class="success-rate-pct">${r.historical_rate || 'N/A'}</span>
+      </div>
+      <div class="success-rate-context">${r.phase || ''} · ${r.indication || ''} — ${r.context || ''}</div>`;
+    }).join('');
+    return `<div class="new-metric-card">
+      <div class="new-metric-title">Historical Trial Success Rates</div>
+      ${rows}
+    </div>`;
+  }
+
+  function renderSentiment(sentiment) {
+    if (!sentiment) return '';
+    const signals = (sentiment.signals || []).map(s =>
+      `<div class="sentiment-signal">"${s}"</div>`).join('');
+    return `<div class="new-metric-card">
+      <div class="new-metric-title">Management Sentiment</div>
+      <div class="sentiment-score ${sentiment.score || 'neutral'}">${(sentiment.score || 'neutral').toUpperCase()}</div>
+      ${signals}
+    </div>`;
+  }
+
+  function renderResults(d) {
+    document.getElementById('companyName').textContent = d.company || 'Unknown';
+    document.getElementById('ticker').textContent = d.ticker ? `${d.exchange || ''} · ${d.ticker}` : 'Ticker not found';
+
+    const metrics = [];
+    if (d.cash_millions != null) metrics.push({ label: 'Cash on hand', value: `$${d.cash_millions}M`, cls: 'green' });
+    if (d.cash_runway_months != null) {
+      const mo = d.cash_runway_months;
+      metrics.push({ label: 'Cash runway', value: `${mo} mo`, sub: d.runway_date || '', cls: mo < 6 ? 'red' : mo < 12 ? 'yellow' : 'green' });
+    }
+    if (d.net_loss_quarterly_millions != null) metrics.push({ label: 'Quarterly net loss', value: `$${d.net_loss_quarterly_millions}M`, cls: 'red' });
+    if (d.trials?.length) metrics.push({ label: 'Active trials', value: d.trials.length, sub: `${d.trials.filter(t => t.phase?.includes('3')).length} in Phase 3`, cls: 'green' });
+
+    document.getElementById('metricsGrid').innerHTML = metrics.map(m => `
+      <div class="metric">
+        <div class="metric-label">${m.label}</div>
+        <div class="metric-value ${m.cls}">${m.value}</div>
+        ${m.sub ? `<div class="metric-sub">${m.sub}</div>` : ''}
+      </div>`).join('');
+
+    document.getElementById('newMetrics').innerHTML =
+      renderBurnRate(d.burn_rate_severity, d.cash_runway_months) +
+      renderSuccessRates(d.trial_success_rates) +
+      renderSentiment(d.sentiment);
+
+    document.getElementById('catalysts').innerHTML = d.catalysts?.length ? d.catalysts.map(c => tag(c, 'catalyst')).join('') : none();
+    document.getElementById('trials').innerHTML = d.trials?.length ? d.trials.map(t => tag(`${t.name} · ${t.phase} · ${t.indication}`, 'trial')).join('') : none();
+    document.getElementById('fdaDates').innerHTML = d.fda_dates?.length ? d.fda_dates.map(f => tag(`${f.type}: ${f.date} — ${f.drug}`, 'fda')).join('') : none();
+    document.getElementById('risks').innerHTML = d.risks?.length ? d.risks.map(r => tag(r, 'risk')).join('') : none();
+    document.getElementById('summary').textContent = d.summary || '';
+    const confEl = document.getElementById('confidence');
+    if (d.data_confidence) {
+      const colors = { high: '#5cff8f', medium: '#ffcc44', low: '#ff6b6b' };
+      const bgs = { high: '#1a2e1a', medium: '#2a2210', low: '#2e1414' };
+      const borders = { high: '#2a4a2a', medium: '#3a3010', low: '#4a2020' };
+      const c = d.data_confidence.toLowerCase();
+      confEl.innerHTML = `<span style="display:inline-block;padding:4px 12px;border-radius:3px;font-size:11px;border:1px solid ${borders[c]||'#333'};background:${bgs[c]||'#1a1a1a'};color:${colors[c]||'#aaa'}">Data confidence: ${d.data_confidence.toUpperCase()}</span>`;
+    } else { confEl.innerHTML = ''; }
+    document.getElementById('results').classList.add('visible');
+  }
+
+  async function analyze() {
+    const text = getText();
+    if (!text) return;
+
+    const btn = document.getElementById('analyzeBtn');
+    const status = document.getElementById('status');
+    const errorBox = document.getElementById('errorBox');
+
+    btn.disabled = true;
+    document.getElementById('results').classList.remove('visible');
+    errorBox.innerHTML = '';
+    status.innerHTML = mode === 'search'
+      ? '<span class="spinner"></span>Searching the web & analyzing...'
+      : '<span class="spinner"></span>Extracting data...';
+
+    try {
+      const res = await fetch('/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Unknown error');
+
+      renderResults(data);
+      status.innerHTML = '';
+    } catch (err) {
+      status.innerHTML = '';
+      errorBox.innerHTML = `<div class="error-box">Error: ${err.message}</div>`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('queryInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') analyze();
+  });
+</script>
+</body>
+</html>
